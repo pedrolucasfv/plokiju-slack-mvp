@@ -1,104 +1,83 @@
-# ? Task 3 ó Plokiju Agents (Slack ? Notion Toggle Automation)
+Ôªø# Task 3 ‚Äî Plokiju Agents (Slack ‚Üí Notion Toggle Automation)
 
-VocÍ È um engenheiro de software sÍnior.
+You are a senior software engineer.
 
-Nesta tarefa, vocÍ vai implementar a terceira integraÁ„o real do projeto **Plokiju Agents**:
+In this task, you will implement the third real integration of the **Plokiju Agents** project:
 
-**Slack message ? adiciona automaticamente um Toggle no Notion ? responde no Slack**
+**Slack message ‚Üí automatically add a Toggle in Notion ‚Üí reply in Slack**
 
-?? Ainda N√O existe OpenAI, banco de dados, autenticaÁ„o ou dashboard.  
-O foco È apenas em integraÁ„o e automaÁ„o real via API.
+‚ö†Ô∏è There is still NO OpenAI, database, authentication, or dashboard. The focus is only on real API integration and automation.
 
----
+## Objective
 
-## ? Objetivo
+When someone sends a Slack message in the format:
 
-Quando alguÈm mandar uma mensagem no Slack no formato:
-
+```
 [title]: [description]
+```
 
+The system must:
 
-O sistema deve:
+1. Receive the event via Slack Events API
+2. Parse the message pattern:
+   - Before `:` ‚Üí toggle title
+   - After `:` ‚Üí toggle content
+3. Automatically add a **toggle** to a fixed Notion page
+4. Reply in Slack confirming:
 
-1. Receber o evento via Slack Events API  
-2. Interpretar a mensagem no padr„o:
+```
+‚úÖ Notion toggle added
+```
 
-- Antes de `:` ? tÌtulo do toggle
-- Depois de `:` ? conte˙do do toggle
+## Notion context
 
-3. Adicionar automaticamente um **toggle** em uma p·gina fixa no Notion
-4. Responder no Slack confirmando:
+- Notion allows adding blocks to a page via REST API:
+  - `POST /v1/blocks/{block_id}/children`
+- Authentication is via Bearer token:
+  - `Authorization: Bearer <token>`
 
-? Notion toggle added
+## Behavior rules
 
+### Required parsing
 
----
+Incoming message:
 
-## <notion_context>
-
-O Notion permite adicionar blocos em uma p·gina via REST API:
-
-POST /v1/blocks/{block_id}/children
-
-
-DocumentaÁ„o oficial:  
-([developers.notion.com](https://developers.notion.com/reference/patch-block-children?utm_source=chatgpt.com))  
-
-AutenticaÁ„o È feita via Bearer Token:
-
-Authorization: Bearer <token>
-
-
-([developers.notion.com](https://developers.notion.com/reference/authentication?utm_source=chatgpt.com))
-
-</notion_context>
-
----
-
-## ? Behavior Rules
-
-### Parsing obrigatÛrio
-
-Mensagem recebida:
-
+```
 Doc: write postmortem
+```
 
+Must generate:
 
-Deve gerar:
+- Title: `"Doc"`
+- Content: `"write postmortem"`
 
-- Title: "Doc"
-- Content: "write postmortem"
+If there is no `:`, ignore.
 
-Se n„o existir `:`, ignore.
+If content is empty, ignore.
 
-Se content estiver vazio, ignore.
+### Required target page
 
----
+To add blocks via API, you need the target page ID.
 
-### P·gina alvo obrigatÛria
+The MVP must use a fixed page defined in `.env`:
 
-Para adicionar blocos via API, vocÍ precisa do ID da p·gina alvo.
-
-O MVP deve usar uma p·gina fixa definida no `.env`:
-
+```
 NOTION_PAGE_ID=
+```
 
-A p·gina precisa estar compartilhada com a integraÁ„o.
+The page must be shared with the integration.
 
----
+### Bot always replies in Slack
 
-### Bot sempre responde no Slack
+After creating the toggle, send:
 
-ApÛs criar o toggle, enviar:
+```
+‚úÖ Notion toggle added
+```
 
-? Notion toggle added
+## Environment variables
 
-
----
-
-## <env_vars>
-
-Adicionar no `.env.example`:
+Add to `.env.example`:
 
 ```env
 NOTION_API_KEY=secret_xxxxxxxxxxxxx
@@ -107,17 +86,16 @@ NOTION_PAGE_ID=xxxxxxxxxxxxxxxxxxxx
 SLACK_BOT_TOKEN=xoxb-xxxx
 ```
 
-<implementation_spec>
-1. Detectar mensagens Slack
-Processar apenas:
+## Implementation spec
 
-event.type === "message"
+1. **Detect Slack messages**
+   - Only process:
+     - `event.type === "message"`
+   - Ignore bots (`bot_id`)
 
-Ignorar bots (bot_id)
+2. **Parse title + content**
 
-2. Parsing Title + Content
-Implementar funÁ„o:
-
+```ts
 function parseDocMessage(text: string) {
   if (!text.includes(":")) return null
 
@@ -127,21 +105,31 @@ function parseDocMessage(text: string) {
     content: rest.join(":").trim(),
   }
 }
-Se content estiver vazio ? ignore.
+```
 
-3. Adicionar Toggle no Notion
+If content is empty, ignore.
+
+3. **Append a Toggle in Notion**
+
 Endpoint:
 
+```
 POST https://api.notion.com/v1/blocks/{page_id}/children
-Headers obrigatÛrios:
+```
 
+Required headers:
+
+```
 Authorization: Bearer <NOTION_API_KEY>
 Notion-Version: 2022-06-28
 Content-Type: application/json
-Notion aceita bearer tokens no header Authorization.
-(developers.notion.com)
+```
 
-Payload mÌnimo (toggle com par·grafo):
+Notion accepts bearer tokens in the `Authorization` header.
+
+Minimal payload (toggle with paragraph):
+
+```json
 {
   "children": [
     {
@@ -166,57 +154,68 @@ Payload mÌnimo (toggle com par·grafo):
     }
   ]
 }
+```
 
-4. Responder no Slack
-Bot responde:
+4. **Reply in Slack**
 
-? Notion toggle added
+Bot replies:
 
-Para responder, use chat.postMessage.
-(docs.slack.dev)
+```
+‚úÖ Notion toggle added
+```
 
-<file_structure>
-Adicionar os arquivos:
+To respond, use `chat.postMessage`.
 
+## File structure
+
+Add files:
+
+```
 src/
   notion/
     notion-client.ts       # appendToggle()
   slack/
-    slack-handler.ts       # detect Doc: ? trigger Notion
+    slack-handler.ts       # detect Doc: ‚Üí trigger Notion
 .env.example
 README.md
-<constraints>
-? N√O usar OpenAI
+```
 
-? N√O usar banco de dados
+## Constraints
 
-? N√O implementar autenticaÁ„o
+- ‚ùå Do NOT use OpenAI
+- ‚ùå Do NOT use database
+- ‚ùå Do NOT implement authentication
+- ‚úÖ Only Slack ‚Üí Notion Toggles integration
 
-? Apenas integraÁ„o Slack ? Notion Toggles
+## Acceptance criteria
 
-</constraints>
-<acceptance_criteria>
-? Mensagem Doc: something cria toggle no Notion
-? Title vem antes do ":"
-? Content vem depois do ":"
-? Bot responde no Slack confirmando
-? Mensagens sem ":" s„o ignoradas
-? Projeto roda local via npm run dev
+- ‚úÖ Message `Doc: something` creates a toggle in Notion
+- ‚úÖ Title is before `:`
+- ‚úÖ Content is after `:`
+- ‚úÖ Bot replies in Slack confirming
+- ‚úÖ Messages without `:` are ignored
+- ‚úÖ Project runs locally via `npm run dev`
 
-? Output esperado
+### Expected output
+
 Terminal:
 
+```
 Incoming Slack message: Doc: write postmortem
-? Notion toggle added
+‚úÖ Notion toggle added
+```
+
 Slack channel:
 
-? Notion toggle added
-Quando terminar, forneÁa:
+```
+‚úÖ Notion toggle added
+```
 
-Arquivos criados
+## Deliverables
 
-Como criar Notion Integration + token
+When finished, provide:
 
-Como obter NOTION_PAGE_ID
-
-Como testar enviando mensagem no Slack
+- Files created
+- How to create a Notion Integration + token
+- How to obtain `NOTION_PAGE_ID`
+- How to test by sending a Slack message

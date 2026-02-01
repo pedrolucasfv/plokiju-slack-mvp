@@ -1,113 +1,85 @@
-# ✅ Task 1 — Plokiju Agents (Slack → Jira Bug Creator)
+﻿# Task 1 — Plokiju Agents (Slack → Jira Bug Creator)
 
-Você é um engenheiro de software sênior.
+You are a senior software engineer.
 
-Nesta tarefa, você vai implementar a primeira automação real do projeto mantendo as outras **Plokiju Agents**:
+In this task, you will implement the first real automation of the **Plokiju Agents** project:
 
-**Slack message → detecta BUG → cria Issue do tipo Bug no Jira → responde no Slack**
+**Slack message → detect BUG → create Bug issue in Jira → reply in Slack**
 
-⚠️ Ainda NÃO existe OpenAI, banco de dados, autenticação ou dashboard.
-Apenas integração e automação real.
+⚠️ There is still NO OpenAI, database, authentication, or dashboard. Only real integration + automation.
 
----
+## Objective
 
-## ✅ Objetivo
+When someone sends a Slack message in the format:
 
-Quando alguém mandar uma mensagem no Slack no formato:
-
+```
 Bug: checkout is failing in production
+```
 
+The system must:
 
-O sistema deve:
+1. Receive the event via Slack Events API
+2. Parse the message pattern:
+   - Before `:` → ticket title (summary)
+   - After `:` → ticket description
+3. Automatically create a **Bug** issue in Jira
+4. Reply in Slack confirming creation:
 
-1. Receber o evento via Slack Events API  
-2. Interpretar a mensagem no padrão:
-
-- Antes de `:` → título do ticket (summary)
-- Depois de `:` → descrição do ticket
-
-3. Criar automaticamente um Issue no Jira do tipo **Bug**
-4. Responder no Slack confirmando a criação:
-
+```
 ✅ Jira Bug created: PROJ-123
+```
 
+## Slack context
 
----
+- You already implemented the endpoint:
+  - `POST /slack/events`
+- Slack sends messages via `message.channels` event.
+- To reply in the channel, use `chat.postMessage`.
 
-## <slack_context>
+## Jira context
 
-Você já implementou o endpoint:
+- Jira Cloud allows creating issues via REST API:
+  - `POST /rest/api/3/issue`
+- The `description` field uses the official **ADF (Atlassian Document Format)**.
 
-POST /slack/events
+## Behavior rules (user‑defined)
 
+### Required parsing
 
-Slack envia mensagens via evento `message.channels`.  
-:contentReference[oaicite:1]{index=1}
+Incoming message:
 
-Para responder no canal, use:
-
-`chat.postMessage`  
-:contentReference[oaicite:2]{index=2}
-
----
-
-## <jira_context>
-
-O Jira Cloud permite criar issues via REST API:
-
-POST /rest/api/3/issue
-
-
-Documentação oficial:  
-:contentReference[oaicite:3]{index=3}
-
-O campo `description` em Jira Cloud usa o formato oficial **ADF (Atlassian Document Format)**.  
-:contentReference[oaicite:4]{index=4}
-
----
-
-## ✅ Behavior Rules (Definido pelo usuário)
-
-### Parsing obrigatório
-
-Mensagem recebida:
-
+```
 Bug: checkout is failing
+```
 
-
-Deve gerar:
+Must generate:
 
 - Summary: `"Bug"`
 - Description: `"checkout is failing"`
 
-Se não existir `:`, ignore a mensagem.
+If there is no `:`, ignore the message.
 
----
+### Fixed issue type
 
-### Tipo fixo
+All created tickets must be:
 
-Todo ticket criado deve ser do tipo:
-
+```
 issuetype.name = "Bug"
+```
 
+### Bot always replies in Slack
 
----
+After creating the issue, send:
 
-### Bot sempre responde no Slack
-
-Após criar o issue, enviar mensagem:
-
+```
 ✅ Jira Bug created: PROJ-123
+```
 
+Using `chat.postMessage`.
 
-Usando `chat.postMessage`.  
-:contentReference[oaicite:5]{index=5}
+## Environment variables
 
----
-
-## <env_vars>
-
-Adicionar no `.env.example`:
+Add to `.env.example`:
 
 ```env
 JIRA_BASE_URL=https://your-domain.atlassian.net
@@ -116,17 +88,18 @@ JIRA_API_TOKEN=xxxxxxxxxxxx
 JIRA_PROJECT_KEY=PROJ
 
 SLACK_BOT_TOKEN=xoxb-xxxx
-<implementation_spec>
-1. Detectar mensagens de canal
-Apenas processar eventos:
+```
 
-event.type === "message"
+## Implementation spec
 
-Ignorar bots (bot_id)
+1. **Detect channel messages**
+   - Only process:
+     - `event.type === "message"`
+   - Ignore bots (`bot_id`)
 
-2. Parsing Title + Description
-Implementar função:
+2. **Parse title + description**
 
+```ts
 function parseBugMessage(text: string) {
   if (!text.includes(":")) return null
 
@@ -136,12 +109,19 @@ function parseBugMessage(text: string) {
     description: rest.join(":").trim(),
   }
 }
-3. Criar Issue Jira (Bug)
+```
+
+3. **Create Jira Issue (Bug)**
+
 Endpoint:
 
+```
 POST /rest/api/3/issue
-Payload mínimo:
+```
 
+Minimal payload:
+
+```json
 {
   "fields": {
     "project": { "key": "PROJ" },
@@ -161,48 +141,69 @@ Payload mínimo:
     "issuetype": { "name": "Bug" }
   }
 }
-ADF é o formato oficial para rich text no Jira Cloud.
+```
 
-4. Responder no Slack
-Após Jira retornar:
+ADF is the official rich‑text format in Jira Cloud.
 
+4. **Reply in Slack**
+
+After Jira returns:
+
+```json
 { "key": "PROJ-123" }
-Enviar mensagem:
+```
 
+Send:
+
+```
 ✅ Jira Bug created: PROJ-123
-Usar chat.postMessage.
+```
 
-<file_structure>
-Adicionar os arquivos:
+Use `chat.postMessage`.
 
+## File structure
+
+Add files:
+
+```
 src/
   jira/
     jira-client.ts       # createBugIssue()
   slack/
-    slack-handler.ts     # parse + trigger jira
+    slack-handler.ts     # parse + trigger Jira
   index.ts               # webhook receiver
 .env.example
 README.md
-<acceptance_criteria>
-✅ Mensagem "Bug: something failed" cria ticket Bug no Jira
-✅ Summary vem antes do ":"
-✅ Description vem depois do ":"
-✅ Bot responde no Slack com PROJ-123
-✅ Mensagens sem ":" são ignoradas
-✅ Projeto roda local via npm run dev
+```
 
-✅ Output esperado
+## Acceptance criteria
+
+- ✅ Message `"Bug: something failed"` creates a Bug issue in Jira
+- ✅ Summary is before `:`
+- ✅ Description is after `:`
+- ✅ Bot replies in Slack with `PROJ-123`
+- ✅ Messages without `:` are ignored
+- ✅ Project runs locally via `npm run dev`
+
+### Expected output
+
 Terminal:
 
+```
 Incoming Slack message: Bug: checkout is failing
 ✅ Jira Bug created: PROJ-123
+```
+
 Slack channel:
 
+```
 ✅ Jira Bug created: PROJ-123
-Quando terminar, forneça:
+```
 
-Arquivos criados
+## Deliverables
 
-Como gerar Jira API Token
+When finished, provide:
 
-Como testar enviando uma mensagem no Slack
+- Files created
+- How to generate a Jira API token
+- How to test by sending a Slack message

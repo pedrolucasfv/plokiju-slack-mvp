@@ -1,87 +1,63 @@
-Prompt — Task 0: Slack Connection MVP (Local)
+﻿# Task 0 — Slack Connection MVP (Local)
 
-Você é um engenheiro de software sênior. Vai implementar um MVP local do projeto Plokiju Agents, focado exclusivamente em integrar o Slack Events API para receber mensagens em tempo real.
+You are a senior software engineer. You will implement a local MVP for the Plokiju Agents project, focused exclusively on integrating the Slack Events API to receive real‑time messages.
 
-O objetivo desta task é construir apenas a fundação de trigger:
+The goal of this task is to build only the trigger foundation:
 
-Slack → Webhook → Log no terminal
+**Slack → Webhook → Terminal log**
 
-Nada de agentes ainda, nada de OpenAI ainda.
+No agents yet, no OpenAI yet.
 
-<project_context>
+## Project context
 
-Nome do projeto: Plokiju Agents
+- Project name: Plokiju Agents
+- Initial MVP (Task 0):
+  - Run locally with Node.js + TypeScript
+  - Expose an HTTP endpoint to receive Slack events
+  - Send immediate ACK
+  - Log received messages
+- Slack sends events via Events API Webhooks and requires URL verification with a challenge.
+- Official documentation note:
+  - URL verification event: respond with the `challenge` field in plaintext
+- Slack sends channel messages via `message.channels` event.
+- Events API flow: Slack sends JSON → server ACK → process event
 
-MVP inicial (Task 0):
+## Requirements (must‑haves)
 
-Rodar localmente em Node.js + TypeScript
+- Implement a local HTTP server using Node.js + TypeScript
+- Use a simple framework (Express or Fastify)
+- Create endpoint:
+  - `POST /slack/events`
+- Implement correctly:
+  - ✅ Slack URL verification handshake
+  - ✅ Immediate ACK (respond 200 quickly)
+  - ✅ Simple async processing (log only)
+- Capture only human messages:
+  - `event.type === "message"`
+  - ignore bot messages (`bot_id`)
 
-Expor endpoint HTTP para receber eventos do Slack
+## Slack behavior
 
-Fazer ACK imediato
+Slack will send payloads like:
 
-Logar mensagens recebidas
+1. **URL Verification**
 
-Slack envia eventos via Events API Webhooks, e exige URL Verification com challenge.
-
-Documentação oficial:
-
-URL verification event: responder com o campo challenge em plaintext
-
-
-Slack envia mensagens de canal via evento message.channels
-
-
-Events API flow: Slack envia JSON → servidor ACK → processa evento
-
-
-</project_context>
-
-<requirements>
-MUST-HAVES
-
-Implementar um servidor HTTP local usando Node.js + TypeScript
-
-Usar um framework simples (Express ou Fastify)
-
-Criar endpoint:
-
-POST /slack/events
-
-Implementar corretamente:
-
-✅ Slack URL verification handshake
-✅ ACK imediato (responder 200 rápido)
-✅ Processamento assíncrono simples (apenas log)
-
-Capturar apenas mensagens humanas:
-
-event.type === "message"
-
-ignorar mensagens de bots (bot_id)
-
-</requirements>
-
-<slack_behavior>
-
-Slack enviará payloads como:
-
-1. URL Verification
+```json
 {
   "type": "url_verification",
   "challenge": "random_string"
 }
+```
 
+Your server must respond:
 
-Seu servidor deve responder:
-
+```
 random_string
+```
 
+2. **Message event**
 
-2. Message Event
-
-Slack enviará eventos como:
-
+```json
 {
   "type": "event_callback",
   "event": {
@@ -89,117 +65,87 @@ Slack enviará eventos como:
     "text": "Bug: checkout is failing"
   }
 }
+```
 
+- Official event: `message.channels`
 
-Evento oficial: message.channels
+## File structure
 
+Create the project inside a local isolated directory:
 
-</slack_behavior>
-
-<file_structure>
-
-Crie o projeto dentro de um diretório isolado local:
-
+```
 plokiju-slack-mvp/
 
 src/
-  index.ts        # servidor principal
-.env.example      # exemplo de variáveis
+  index.ts        # main server
+.env.example      # env var example
 package.json
 tsconfig.json
 README.md
+```
 
+## Implementation spec
 
-</file_structure>
+`/slack/events` must:
 
-<implementation_spec>
+- Detect `type === "url_verification"` and return `challenge`
+- Otherwise:
+  - return `200 OK` immediately (ACK)
+  - then log the event content
 
-Endpoint /slack/events deve:
+Example:
 
-Detectar type === "url_verification" e retornar challenge
-
-Caso contrário:
-
-retornar 200 OK imediatamente (ACK)
-
-depois logar o conteúdo do evento
-
-Exemplo:
-
+```ts
 console.log("Incoming Slack message:", event.text)
+```
 
+Slack requires a fast ACK, otherwise it will resend events.
 
-Slack exige ACK rápido, senão reenvia eventos.
+## Local dev instructions (must include in README)
 
+- Run server:
 
-</implementation_spec>
-
-<local_dev_instructions>
-
-MUST INCLUDE
-
-Guia no README explicando como testar local:
-
-Rodar servidor:
-
+```
 npm run dev
+```
 
+- Expose localhost with ngrok:
 
-Expor localhost com ngrok:
-
+```
 ngrok http 3000
+```
 
+- Configure Slack App:
+  - Event Subscriptions → Enable
+  - Request URL = ngrok URL + `/slack/events`
+  - Subscribe to Bot Events: `message.channels`
 
-Configurar Slack App:
+## Constraints
 
-Event Subscriptions → Enable
+- Do NOT implement OpenAI yet
+- Do NOT implement database
+- Do NOT implement authentication
+- Do NOT implement queue or worker
+- Do NOT create frontend
+- Only Slack → webhook → logs
 
-Request URL = ngrok URL + /slack/events
+## Acceptance criteria
 
-Subscribe to Bot Events:
+- ✅ Server runs locally on `localhost:3000`
+- ✅ Slack validates Request URL correctly (challenge responded)
+- ✅ Messages posted in Slack appear in terminal:
 
-message.channels
-
-
-</local_dev_instructions>
-
-<constraints>
-
-NÃO implementar OpenAI ainda
-
-NÃO implementar banco de dados
-
-NÃO implementar autenticação
-
-NÃO implementar queue ou worker
-
-NÃO criar frontend
-
-Apenas Slack → webhook → logs
-
-</constraints>
-
-<acceptance_criteria>
-
-✅ Servidor roda local em localhost:3000
-
-✅ Slack valida corretamente a Request URL (challenge respondido)
-
-✅ Mensagens postadas no Slack aparecem no terminal:
-
+```
 Incoming Slack message: Bug: checkout is failing
+```
 
+- ✅ Bot events are ignored
+- ✅ README contains full Slack App + ngrok setup
 
-✅ Eventos de bot são ignorados
+## Deliverables
 
-✅ README contém setup completo do Slack App e ngrok
+When finished, provide:
 
-</acceptance_criteria>
-
-Quando terminar, forneça:
-
-Lista dos arquivos criados
-
-Explicação do fluxo Slack → Webhook
-
-Como executar e testar localmente
+- List of files created
+- Explanation of the Slack → Webhook flow
+- How to run and test locally

@@ -1,109 +1,110 @@
-# ✅ Task 2 — Plokiju Agents (Slack → GitHub Issue Automation)
+﻿# Task 2 — Plokiju Agents (Slack → GitHub Issue Automation)
 
-Você é um engenheiro de software sênior.
+You are a senior software engineer.
 
-Nesta tarefa, você vai implementar a segunda integração real do projeto **Plokiju Agents**:
+In this task, you will implement the second real integration of the **Plokiju Agents** project:
 
-**Slack message → cria automaticamente uma Issue no GitHub → responde no Slack**
+**Slack message → create a GitHub issue → reply in Slack**
 
-⚠️ Ainda NÃO existe OpenAI, banco de dados, autenticação ou dashboard.  
-O foco é apenas em integração e automação real via API.
+⚠️ There is still NO OpenAI, database, authentication, or dashboard. The focus is only on real API integration and automation.
 
----
+## Objective
 
-## ✅ Objetivo
+When someone sends a Slack message in the format:
 
-Quando alguém mandar uma mensagem no Slack no formato:
-
+```
 Issue: login button is broken on mobile
+```
 
+The system must:
 
-O sistema deve:
+1. Receive the event via Slack Events API
+2. Parse the message pattern:
+   - Before `:` → issue title (GitHub title)
+   - After `:` → issue description (GitHub body)
+3. Automatically create a GitHub issue
+4. Reply in Slack confirming:
 
-1. Receber o evento via Slack Events API  
-2. Interpretar a mensagem no padrão:
-
-- Antes de `:` → título da issue (GitHub title)
-- Depois de `:` → descrição da issue (GitHub body)
-
-3. Criar automaticamente uma Issue no GitHub
-4. Responder no Slack confirmando:
-
+```
 ✅ GitHub Issue created: #24
+```
 
+## GitHub context
 
----
-
-## <github_context>
-
-GitHub permite criar issues via REST API:
-
-POST /repos/{owner}/{repo}/issues
-
-
-Documentação oficial:  
-([docs.github.com](https://docs.github.com/en/rest/issues/issues?utm_source=chatgpt.com))
-
-Payload mínimo:
+- GitHub allows creating issues via REST API:
+  - `POST /repos/{owner}/{repo}/issues`
+- Minimal payload:
 
 ```json
 {
   "title": "Issue title",
   "body": "Issue description"
 }
-Autenticação deve ser feita com Personal Access Token (PAT).
+```
 
-GitHub recomenda PATs fine-grained ou classic dependendo do uso.
-(docs.github.com)
+- Authentication must be via Personal Access Token (PAT).
+- GitHub recommends fine‑grained or classic PATs depending on use.
 
-</github_context>
+## Behavior rules
 
-✅ Behavior Rules
-Parsing obrigatório
-Mensagem recebida:
+### Required parsing
 
+Incoming message:
+
+```
 Issue: login button is broken
-Deve gerar:
+```
 
-Title: "Issue"
+Must generate:
 
-Body: "login button is broken"
+- Title: `"Issue"`
+- Body: `"login button is broken"`
 
-Se não existir :, ignore a mensagem.
+If there is no `:`, ignore the message.
 
-GitHub Repo Target
-A issue deve ser criada sempre em um repo fixo definido no .env:
+### GitHub repo target
 
+The issue must always be created in a fixed repo defined in `.env`:
+
+```
 GITHUB_OWNER=
 GITHUB_REPO=
-Bot sempre responde no Slack
-Após criar a issue, enviar no Slack:
+```
 
+### Bot always replies in Slack
+
+After creating the issue, send in Slack:
+
+```
 ✅ GitHub Issue created: #<number>
-<env_vars>
-Adicionar no .env.example:
+```
 
+## Environment variables
+
+Add to `.env.example`:
+
+```env
 GITHUB_TOKEN=ghp_xxxxxxxxxxxxx
 GITHUB_OWNER=your-username
 GITHUB_REPO=your-repo
 
 SLACK_BOT_TOKEN=xoxb-xxxx
-Token precisa ter permissão para criar issues no repo.
+```
 
-GitHub fornece um header X-Accepted-GitHub-Permissions para debug de permissões.
-(docs.github.com)
+The token needs permission to create issues in the repo.
 
-<implementation_spec>
-1. Detectar mensagens Slack
-Apenas processar:
+GitHub provides an `X-Accepted-GitHub-Permissions` header to debug permissions.
 
-event.type === "message"
+## Implementation spec
 
-Ignorar bots (bot_id)
+1. **Detect Slack messages**
+   - Only process:
+     - `event.type === "message"`
+   - Ignore bots (`bot_id`)
 
-2. Parsing Title + Body
-Implementar função:
+2. **Parse title + body**
 
+```ts
 function parseIssueMessage(text: string) {
   if (!text.includes(":")) return null
 
@@ -113,35 +114,50 @@ function parseIssueMessage(text: string) {
     body: rest.join(":").trim(),
   }
 }
-Se body estiver vazio, ignore.
+```
 
-3. Criar Issue no GitHub
-Implementar client:
+If body is empty, ignore.
+
+3. **Create GitHub issue**
 
 Endpoint:
 
+```
 POST https://api.github.com/repos/{owner}/{repo}/issues
+```
+
 Headers:
 
+```
 Authorization: Bearer <GITHUB_TOKEN>
 Accept: application/vnd.github+json
-A API oficial de issues está documentada aqui:
-(docs.github.com)
+```
 
-4. Responder no Slack
-GitHub retorna:
+The official issues API is documented by GitHub.
 
+4. **Reply in Slack**
+
+GitHub returns:
+
+```json
 {
   "number": 24,
   "html_url": "https://github.com/owner/repo/issues/24"
 }
-Bot responde:
+```
 
+Bot replies:
+
+```
 ✅ GitHub Issue created: #24
-https://github.com/.../24
-<file_structure>
-Adicionar os arquivos:
+https://github.com/owner/repo/issues/24
+```
 
+## File structure
+
+Add files:
+
+```
 src/
   github/
     github-client.ts       # createIssue()
@@ -149,38 +165,44 @@ src/
     slack-handler.ts       # detect Issue: → trigger GitHub
 .env.example
 README.md
-<constraints>
-❌ NÃO usar OpenAI
+```
 
-❌ NÃO usar banco de dados
+## Constraints
 
-❌ NÃO implementar autenticação
+- ❌ Do NOT use OpenAI
+- ❌ Do NOT use database
+- ❌ Do NOT implement authentication
+- ✅ Only Slack → GitHub Issues integration
 
-✅ Apenas integração Slack → GitHub Issues
+## Acceptance criteria
 
-</constraints>
-<acceptance_criteria>
-✅ Mensagem Issue: something broken cria issue no GitHub
-✅ Title vem antes do ":"
-✅ Body vem depois do ":"
-✅ Bot responde no Slack com número e link da issue
-✅ Mensagens sem ":" são ignoradas
-✅ Projeto roda local via npm run dev
+- ✅ Message `Issue: something broken` creates a GitHub issue
+- ✅ Title is before `:`
+- ✅ Body is after `:`
+- ✅ Bot replies in Slack with issue number and link
+- ✅ Messages without `:` are ignored
+- ✅ Project runs locally via `npm run dev`
 
-✅ Output esperado
+### Expected output
+
 Terminal:
 
+```
 Incoming Slack message: Issue: login broken
 ✅ GitHub Issue created: #24
+```
+
 Slack channel:
 
+```
 ✅ GitHub Issue created: #24
 https://github.com/user/repo/issues/24
-Quando terminar, forneça:
+```
 
-Arquivos criados
+## Deliverables
 
-Como gerar GitHub PAT corretamente
+When finished, provide:
 
-Como testar enviando mensagem no Slack
-
+- Files created
+- How to correctly generate a GitHub PAT
+- How to test by sending a Slack message
