@@ -1,9 +1,10 @@
 import fetch from "node-fetch";
+import { createIssue } from "../github/github-client";
 import { createBugIssue } from "../jira/jira-client";
 
-type ParsedBugMessage = {
-  summary: string;
-  description: string;
+type ParsedMessage = {
+  title: string;
+  body: string;
 };
 
 const SLACK_POST_MESSAGE_URL = "https://slack.com/api/chat.postMessage";
@@ -16,13 +17,13 @@ const getRequiredEnv = (key: string): string => {
   return value;
 };
 
-export function parseBugMessage(text: string): ParsedBugMessage | null {
+export function parseMessage(text: string): ParsedMessage | null {
   if (!text.includes(":")) return null;
 
-  const [summary, ...rest] = text.split(":");
+  const [title, ...rest] = text.split(":");
   return {
-    summary: summary.trim(),
-    description: rest.join(":").trim(),
+    title: title.trim(),
+    body: rest.join(":").trim(),
   };
 }
 
@@ -60,22 +61,33 @@ export async function handleSlackEvent(body: any): Promise<void> {
   if (!text) return;
   console.log("Incoming Slack message:", text);
 
-  const parsed = parseBugMessage(text);
-  if (!parsed) {
-    console.log("Just a regular message, not a bug report");
-    return;
-  }
-
-  const issue = await createBugIssue(parsed);
-  console.log(`✅ Jira Bug created: ${issue.key}`);
-
   const channel = typeof event.channel === "string" ? event.channel : "";
   if (!channel) return;
 
+  const parsed = parseMessage(text);
+  if (!parsed) {
+    console.log("Just a regular message, missing ':'");
+    return;
+  }
+
+  if (!parsed.body) {
+    console.log("Message missing body after ':'");
+    return;
+  }
+
+  const [jiraIssue, githubIssue] = await Promise.all([
+    createBugIssue({ summary: parsed.title, description: parsed.body }),
+    createIssue({ title: parsed.title, body: parsed.body }),
+  ]);
+
+  console.log(`? Jira Bug created: ${jiraIssue.key}`);
+  console.log(`? GitHub Issue created: #${githubIssue.number}`);
+
   const baseUrl = getRequiredEnv("JIRA_BASE_URL").replace(/\/+$/, "");
-  const issueUrl = `${baseUrl}/browse/${issue.key}`;
+  const jiraUrl = `${baseUrl}/browse/${jiraIssue.key}`;
+
   await postSlackMessage(
     channel,
-    `✅ Jira Bug created: ${issue.key} ${issueUrl}`
+    `? Jira Bug created: ${jiraIssue.key} ${jiraUrl}\n? GitHub Issue created: #${githubIssue.number} ${githubIssue.html_url}`
   );
 }
