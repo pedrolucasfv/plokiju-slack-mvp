@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import { handleSlackEvent } from "./slack/slack-handler";
 
 dotenv.config();
 
@@ -19,19 +20,11 @@ app.post("/slack/events", (req, res) => {
   // ACK immediately so Slack does not retry.
   res.status(200).send();
 
-  // Process asynchronously (just log for MVP).
+  // Process asynchronously to avoid Slack timeouts.
   setImmediate(() => {
-    const event = body?.event;
-    if (!event || event.type !== "message") return;
-    if (event.bot_id) return;
-    if (event.subtype === "bot_message") return;
-
-    const text = typeof event.text === "string" ? event.text : "";
-    if (text) {
-      console.log("Incoming Slack message:", text);
-    } else {
-      console.log("Incoming Slack message:", event);
-    }
+    handleSlackEvent(body).catch((error) => {
+      console.error("Slack event handling error:", error);
+    });
   });
 });
 
