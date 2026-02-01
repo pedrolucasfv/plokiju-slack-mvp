@@ -1,6 +1,7 @@
 import fetch from "node-fetch";
 import { createIssue } from "../github/github-client";
 import { createBugIssue } from "../jira/jira-client";
+import { appendToggle } from "../notion/notion-client";
 
 type ParsedMessage = {
   title: string;
@@ -17,13 +18,29 @@ const getRequiredEnv = (key: string): string => {
   return value;
 };
 
+const getNotionPageUrl = (): string => {
+  const raw = getRequiredEnv("NOTION_PAGE_ID");
+  const match = raw.match(/[0-9a-fA-F]{32}/g);
+  const id = match && match.length > 0 ? match[match.length - 1] : raw;
+  const compact = id.replace(/-/g, "").toLowerCase();
+  return `https://www.notion.so/${compact}`;
+};
+
 export function parseMessage(text: string): ParsedMessage | null {
+  const parsed = parseDocMessage(text);
+  if (!parsed) return null;
+  return { title: parsed.title, body: parsed.content };
+}
+
+export function parseDocMessage(
+  text: string
+): { title: string; content: string } | null {
   if (!text.includes(":")) return null;
 
   const [title, ...rest] = text.split(":");
   return {
     title: title.trim(),
-    body: rest.join(":").trim(),
+    content: rest.join(":").trim(),
   };
 }
 
@@ -75,19 +92,22 @@ export async function handleSlackEvent(body: any): Promise<void> {
     return;
   }
 
-  const [jiraIssue, githubIssue] = await Promise.all([
+  const [jiraIssue, githubIssue, notionToggle] = await Promise.all([
     createBugIssue({ summary: parsed.title, description: parsed.body }),
     createIssue({ title: parsed.title, body: parsed.body }),
+    appendToggle({ title: parsed.title, content: parsed.body }),
   ]);
 
   console.log(`? Jira Bug created: ${jiraIssue.key}`);
   console.log(`? GitHub Issue created: #${githubIssue.number}`);
+  console.log(`? Notion toggle added: ${notionToggle.blockId}`);
 
   const baseUrl = getRequiredEnv("JIRA_BASE_URL").replace(/\/+$/, "");
   const jiraUrl = `${baseUrl}/browse/${jiraIssue.key}`;
+  const notionPageUrl = getNotionPageUrl();
 
   await postSlackMessage(
     channel,
-    `? Jira Bug created: ${jiraIssue.key} ${jiraUrl}\n? GitHub Issue created: #${githubIssue.number} ${githubIssue.html_url}`
+    `? Jira Bug created: ${jiraIssue.key} ${jiraUrl}\n? GitHub Issue created: #${githubIssue.number} ${githubIssue.html_url}\n? Notion toggle added: ${notionPageUrl}`
   );
 }

@@ -1,6 +1,6 @@
-# Plokiju Agents - Slack -> Jira Bug + GitHub Issue Creator (Local)
+# Plokiju Agents - Slack -> Jira Bug + GitHub Issue + Notion Toggle (Local)
 
-Minimal local MVP to receive Slack Events API payloads, create Jira Bug issues and GitHub issues, and respond in Slack.
+Minimal local MVP to receive Slack Events API payloads, create Jira Bug issues, GitHub issues, and append Notion toggles, and respond in Slack.
 
 ## What it does
 
@@ -10,7 +10,8 @@ Minimal local MVP to receive Slack Events API payloads, create Jira Bug issues a
 - Parses messages in the format `Title: description`
 - Creates Jira issues with issue type **Bug**
 - Creates GitHub issues in a fixed repo
-- Responds back in Slack with both links
+- Appends a Notion toggle to a fixed page
+- Responds back in Slack with all links
 
 ## Local setup
 
@@ -27,7 +28,7 @@ npm install
 copy .env.example .env
 ```
 
-Fill in Jira + GitHub + Slack values in `.env`.
+Fill in Jira + GitHub + Notion + Slack values in `.env`.
 
 3) Run the server
 
@@ -74,9 +75,24 @@ Slack will send a URL verification payload; the server responds with the challen
 3) Ensure the token can create issues in the target repo
 4) Paste into `GITHUB_TOKEN` in `.env`
 
+## Create Notion integration + token
+
+1) Go to **Notion** -> **Settings & members** -> **Integrations**
+2) Click **Develop your own integrations**
+3) Create a new internal integration
+4) Copy the **Internal Integration Token**
+5) Paste into `NOTION_API_KEY` in `.env`
+
+## Get NOTION_PAGE_ID
+
+1) Open the page that should receive the toggle in Notion
+2) Click **Share** and invite your integration to the page
+3) Copy the page URL and extract the page ID (the long hex-like string)
+4) Paste into `NOTION_PAGE_ID` in `.env`
+
 ## Expected flow
 
-Slack -> Webhook (/slack/events) -> Immediate ACK -> Create Jira Bug + GitHub Issue -> Post Slack confirmation
+Slack -> Webhook (/slack/events) -> Immediate ACK -> Create Jira Bug + GitHub Issue + Notion Toggle -> Post Slack confirmation
 
 Example log:
 
@@ -84,6 +100,7 @@ Example log:
 Incoming Slack message: Issue: login button is broken
 ? Jira Bug created: PROJ-123
 ? GitHub Issue created: #24
+✅ Notion toggle added: 12345678-1234-1234-1234-1234567890ab
 ```
 
 ## Test by sending a Slack message
@@ -99,4 +116,5 @@ The bot should reply in the same channel:
 ```
 ? Jira Bug created: PROJ-123 https://your-domain.atlassian.net/browse/PROJ-123
 ? GitHub Issue created: #24 https://github.com/owner/repo/issues/24
+✅ Notion toggle added
 ```
